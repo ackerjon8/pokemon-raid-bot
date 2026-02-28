@@ -29,27 +29,60 @@ client.on("messageCreate", async (message) => {
       return message.reply("❌ Please provide a Pokémon name.");
     }
 
+    let raidType = "Standard";
+    let embedColor = 0xFF0000;
+
+    const firstArg = args[0]?.toLowerCase();
+
+    // Mega
+    if (firstArg === "mega") {
+      raidType = "Mega";
+      embedColor = 0x9b59b6;
+      args.shift();
+    }
+
+    // Gigantamax
+    else if (firstArg === "gigantamax") {
+      raidType = "Gigantamax";
+      embedColor = 0xf1c40f;
+      args.shift();
+    }
+
+    // Dynamax
+    else if (firstArg === "dynamax") {
+      raidType = "Dynamax";
+      embedColor = 0x3498db;
+      args.shift();
+    }
+
     const pokemonName = args.join("-").toLowerCase();
 
     try {
       const res = await axios.get(`https://pokeapi.co/api/v2/pokemon/${pokemonName}`);
       const pokemon = res.data;
 
-      const embed = new EmbedBuilder()
-        .setTitle(`Pokémon: ${pokemon.name.toUpperCase()}`)
-        .setDescription(
-`Raid hosted by ${message.author}
+      const officialArtwork =
+        pokemon.sprites.other["official-artwork"].front_default;
 
-📜 **Rules**
-5 invites available (unless host states different)
-Please message below if interested!`
+      const embed = new EmbedBuilder()
+        .setTitle(`🔥 ${raidType.toUpperCase()} RAID — ${pokemon.name.toUpperCase()}`)
+        .setDescription(
+`🎮 **Host:** ${message.author}
+
+⚔️ React below to join!
+⏳ Raid starting soon
+
+Good luck trainers!`
         )
-        .setThumbnail(pokemon.sprites.front_default)
-        .setColor(0xFFA500)
-        .setFooter({ text: "Pokémon GO Raid Bot" })
+        .setImage(officialArtwork)
+        .setColor(embedColor)
+        .setFooter({ text: "Pokémon GO Raid System" })
         .setTimestamp();
 
-      message.channel.send({ embeds: [embed] });
+      message.channel.send({
+        content: "@everyone 🚨 RAID ALERT!",
+        embeds: [embed]
+      });
 
     } catch (err) {
       message.reply("❌ Pokémon not found!");
