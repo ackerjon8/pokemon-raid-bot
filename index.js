@@ -64,8 +64,10 @@ client.on("messageCreate", async (message) => {
       const officialArtwork =
         pokemon.sprites.other["official-artwork"].front_default;
 
+      const displayName = pokemon.name.toUpperCase();
+
       const embed = new EmbedBuilder()
-        .setTitle(`🔥 ${raidType.toUpperCase()} RAID — ${pokemon.name.toUpperCase()}`)
+        .setTitle(`🔥 ${raidType.toUpperCase()} RAID — ${displayName}`)
         .setDescription(
 `🎮 **Host:** ${message.author}
 
@@ -79,8 +81,9 @@ Good luck trainers!`
         .setFooter({ text: "Pokémon GO Raid System" })
         .setTimestamp();
 
+      // Smart notification
       message.channel.send({
-        content: "@everyone 🚨 RAID ALERT!",
+        content: `@everyone ${raidType !== "Standard" ? raidType.toUpperCase() + " " : ""}${displayName} RAID!`,
         embeds: [embed]
       });
 
