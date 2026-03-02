@@ -1,5 +1,6 @@
+require('dotenv').config();
 const { Client, GatewayIntentBits, EmbedBuilder } = require('discord.js');
-const fetch = require('node-fetch');
+const axios = require('axios');
 
 const client = new Client({
     intents: [
@@ -18,7 +19,7 @@ const GITHUB_BRANCH = "main";
 const IMAGE_BASE_URL = `https://raw.githubusercontent.com/${GITHUB_USER}/${GITHUB_REPO}/${GITHUB_BRANCH}/assets/raids/`;
 
 // ================================
-// 🧠 Helper: Format Pokemon Name
+// 🧠 Format Pokemon Name
 // ================================
 function formatPokemonName(name) {
     return name
@@ -28,29 +29,29 @@ function formatPokemonName(name) {
 }
 
 // ================================
-// 🖼️ Helper: Get Custom Image URL
+// 🖼️ Get Image (Custom → Fallback)
 // ================================
 async function getImageUrl(pokemonName) {
     const formatted = pokemonName.toLowerCase().replace(/ /g, "-");
     const customImage = `${IMAGE_BASE_URL}${formatted}.png`;
 
     try {
-        const response = await fetch(customImage, { method: "HEAD" });
-        if (response.ok) {
-            return customImage;
-        }
-    } catch (err) {
-        console.log("Custom image not found, using fallback.");
+        await axios.head(customImage);
+        return customImage;
+    } catch {
+        console.log("Custom image not found. Using PokéAPI fallback.");
     }
 
-    // Fallback to PokéAPI
-    const apiName = formatted
-        .replace("mega-", "mega-")
-        .replace("dynamax-", "");
+    // Remove dynamax prefix for API
+    const apiName = formatted.replace("dynamax-", "");
 
-    const response = await fetch(`https://pokeapi.co/api/v2/pokemon/${apiName}`);
-    const data = await response.json();
-    return data.sprites.other["official-artwork"].front_default;
+    try {
+        const response = await axios.get(`https://pokeapi.co/api/v2/pokemon/${apiName}`);
+        return response.data.sprites.other["official-artwork"].front_default;
+    } catch (error) {
+        console.error("PokéAPI failed:", error.message);
+        return null;
+    }
 }
 
 // ================================
@@ -75,9 +76,12 @@ client.on('messageCreate', async message => {
             .setTitle(`🔥 ${displayName} Raid 🔥`)
             .setDescription(`A wild **${displayName}** has appeared!\n\nReact below to join the raid!`)
             .setColor(0xff0000)
-            .setImage(imageUrl)
-            .setFooter({ text: "Raid Bot | Powered by ackerjon8" })
+            .setFooter({ text: "Raid Bot | ackerjon8" })
             .setTimestamp();
+
+        if (imageUrl) {
+            embed.setImage(imageUrl);
+        }
 
         await message.channel.send({
             content: `@everyone 🚨 ${displayName} Raid!`,
@@ -87,4 +91,7 @@ client.on('messageCreate', async message => {
     }
 });
 
-client.login("YOUR_BOT_TOKEN_HERE");
+// ================================
+// 🚀 LOGIN
+// ================================
+client.login(process.env.BOT_TOKEN);
