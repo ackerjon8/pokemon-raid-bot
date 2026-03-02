@@ -1,96 +1,90 @@
-require('dotenv').config();
 const { Client, GatewayIntentBits, EmbedBuilder } = require('discord.js');
-const axios = require('axios');
+const fetch = require('node-fetch');
 
 const client = new Client({
-  intents: [
-    GatewayIntentBits.Guilds,
-    GatewayIntentBits.GuildMessages,
-    GatewayIntentBits.MessageContent
-  ]
+    intents: [
+        GatewayIntentBits.Guilds,
+        GatewayIntentBits.GuildMessages,
+        GatewayIntentBits.MessageContent
+    ]
 });
 
-const PREFIX = "!";
+// ================================
+// 🔧 CONFIG
+// ================================
+const GITHUB_USER = "ackerjon8";
+const GITHUB_REPO = "pokemon-raid-bot";
+const GITHUB_BRANCH = "main";
+const IMAGE_BASE_URL = `https://raw.githubusercontent.com/${GITHUB_USER}/${GITHUB_REPO}/${GITHUB_BRANCH}/assets/raids/`;
 
-client.on("clientReady", () => {
-  console.log(`✅ Logged in as ${client.user.tag}`);
-});
+// ================================
+// 🧠 Helper: Format Pokemon Name
+// ================================
+function formatPokemonName(name) {
+    return name
+        .split(' ')
+        .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(' ');
+}
 
-client.on("messageCreate", async (message) => {
-  if (message.author.bot) return;
-  if (!message.content.startsWith(PREFIX)) return;
-
-  const args = message.content.slice(PREFIX.length).trim().split(/ +/);
-  const command = args.shift().toLowerCase();
-
-  if (command === "raid") {
-
-    if (!args.length) {
-      return message.reply("❌ Please provide a Pokémon name.");
-    }
-
-    let raidType = "Standard";
-    let embedColor = 0xFF0000;
-
-    const firstArg = args[0]?.toLowerCase();
-
-    // Mega
-    if (firstArg === "mega") {
-      raidType = "Mega";
-      embedColor = 0x9b59b6;
-      args.shift();
-    }
-
-    // Gigantamax
-    else if (firstArg === "gigantamax") {
-      raidType = "Gigantamax";
-      embedColor = 0xf1c40f;
-      args.shift();
-    }
-
-    // Dynamax
-    else if (firstArg === "dynamax") {
-      raidType = "Dynamax";
-      embedColor = 0x3498db;
-      args.shift();
-    }
-
-    const pokemonName = args.join("-").toLowerCase();
+// ================================
+// 🖼️ Helper: Get Custom Image URL
+// ================================
+async function getImageUrl(pokemonName) {
+    const formatted = pokemonName.toLowerCase().replace(/ /g, "-");
+    const customImage = `${IMAGE_BASE_URL}${formatted}.png`;
 
     try {
-      const res = await axios.get(`https://pokeapi.co/api/v2/pokemon/${pokemonName}`);
-      const pokemon = res.data;
-
-      const officialArtwork =
-        pokemon.sprites.other["official-artwork"].front_default;
-
-      const displayName = pokemon.name.toUpperCase();
-
-      const embed = new EmbedBuilder()
-        .setTitle(`🔥 ${raidType.toUpperCase()} RAID — ${displayName}`)
-        .setDescription(
-`🎮 **Host:** ${message.author}
-
-⚔️ React below to join!
-⏳ Raid starting soon
-
-Good luck trainers!`
-        )
-        .setImage(officialArtwork)
-        .setColor(embedColor)
-        .setFooter({ text: "Pokémon GO Raid System" })
-        .setTimestamp();
-
-      // Smart notification
-      message.channel.send({
-        content: `@everyone ${raidType !== "Standard" ? raidType.toUpperCase() + " " : ""}${displayName} RAID!`,
-        embeds: [embed]
-      });
-
+        const response = await fetch(customImage, { method: "HEAD" });
+        if (response.ok) {
+            return customImage;
+        }
     } catch (err) {
-      message.reply("❌ Pokémon not found!");
+        console.log("Custom image not found, using fallback.");
     }
-  }
+
+    // Fallback to PokéAPI
+    const apiName = formatted
+        .replace("mega-", "mega-")
+        .replace("dynamax-", "");
+
+    const response = await fetch(`https://pokeapi.co/api/v2/pokemon/${apiName}`);
+    const data = await response.json();
+    return data.sprites.other["official-artwork"].front_default;
+}
+
+// ================================
+// ⚔️ RAID COMMAND
+// ================================
+client.on('messageCreate', async message => {
+    if (message.author.bot) return;
+
+    if (message.content.startsWith("!raid")) {
+
+        const args = message.content.slice(6).trim().toLowerCase().split(" ");
+        const pokemonInput = args.join(" ");
+        const displayName = formatPokemonName(pokemonInput);
+
+        if (!pokemonInput) {
+            return message.reply("Please specify a Pokémon.");
+        }
+
+        const imageUrl = await getImageUrl(pokemonInput);
+
+        const embed = new EmbedBuilder()
+            .setTitle(`🔥 ${displayName} Raid 🔥`)
+            .setDescription(`A wild **${displayName}** has appeared!\n\nReact below to join the raid!`)
+            .setColor(0xff0000)
+            .setImage(imageUrl)
+            .setFooter({ text: "Raid Bot | Powered by ackerjon8" })
+            .setTimestamp();
+
+        await message.channel.send({
+            content: `@everyone 🚨 ${displayName} Raid!`,
+            embeds: [embed],
+            allowedMentions: { parse: ['everyone'] }
+        });
+    }
 });
 
-client.login(process.env.TOKEN);
+client.login("YOUR_BOT_TOKEN_HERE");
