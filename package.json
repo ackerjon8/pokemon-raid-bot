@@ -1,15 +1,15 @@
 {
   "name": "pokemon-raid-bot",
   "version": "1.0.0",
-  "description": "",
+  "description": "Pokemon Raid Alert Bot",
   "main": "index.js",
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
   "type": "commonjs",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
   "dependencies": {
     "axios": "^1.13.6",
     "discord.js": "^14.25.1",
