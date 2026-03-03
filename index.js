@@ -18,7 +18,7 @@ const client = new Client({
 });
 
 // ================================
-// 🔧 CONFIG (YOUR IDs)
+// 🔧 CONFIG
 // ================================
 
 const RAID_NOTIFICATION_CHANNEL_ID = "1478302015577919510";
@@ -29,6 +29,42 @@ const POGO_ROLE_ID = "1478302012675461188";
 const MYSTIC_ROLE_ID = "1478302012675461184";
 const VALOR_ROLE_ID = "1478302012675461185";
 const INSTINCT_ROLE_ID = "1478302012675461183";
+
+// ✅ YOUR CORRECT GITHUB RAW URL
+const BASE_IMAGE_URL = "https://raw.githubusercontent.com/ackerjon8/pokemon-raid-bot/main/assets/raids/";
+
+// ================================
+// 🧠 HELPERS
+// ================================
+
+function formatPokemonName(name) {
+    return name.split(' ')
+        .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(' ');
+}
+
+function cleanFileName(name) {
+    return name.toLowerCase().replace(/ /g, "-");
+}
+
+function getImageURL(input) {
+    input = input.toLowerCase().trim();
+
+    if (input.includes("mega")) {
+        const clean = input.replace("mega ", "").replace("mega-", "").trim();
+        return `${BASE_IMAGE_URL}mega-${cleanFileName(clean)}.png`;
+    }
+
+    if (input.includes("gigantamax") || input.includes("gmax")) {
+        const clean = input
+            .replace("gigantamax ", "")
+            .replace("gmax ", "")
+            .trim();
+        return `${BASE_IMAGE_URL}gigantamax-${cleanFileName(clean)}.png`;
+    }
+
+    return `${BASE_IMAGE_URL}${cleanFileName(input)}.png`;
+}
 
 // ================================
 // 🚪 AUTO KICK AFTER 24 HOURS
@@ -56,11 +92,8 @@ client.on('messageReactionAdd', async (reaction, user) => {
     if (user.bot) return;
 
     if (reaction.partial) {
-        try {
-            await reaction.fetch();
-        } catch {
-            return;
-        }
+        try { await reaction.fetch(); }
+        catch { return; }
     }
 
     if (reaction.message.id !== RULES_MESSAGE_ID) return;
@@ -80,7 +113,7 @@ client.on('messageReactionAdd', async (reaction, user) => {
 });
 
 // ================================
-// 🏆 TEAM VERIFICATION
+// 🏆 TEAM SYSTEM
 // ================================
 
 client.on('messageCreate', async message => {
@@ -129,7 +162,7 @@ client.on('messageCreate', async message => {
 });
 
 // ================================
-// ⚔️ RAID SYSTEM WITH IMAGE
+// ⚔️ RAID SYSTEM (MEGA + GMAX SUPPORT)
 // ================================
 
 client.on('messageCreate', async message => {
@@ -137,47 +170,33 @@ client.on('messageCreate', async message => {
     if (message.author.bot) return;
     if (!message.content.startsWith("!raid")) return;
 
-    const pokemonName = message.content.slice(6).trim().toLowerCase();
-    if (!pokemonName) return message.reply("Please specify a Pokémon.");
+    const args = message.content.slice(6).trim();
+    if (!args) return message.reply("Please specify a Pokémon.");
 
-    try {
+    const displayName = formatPokemonName(args);
+    const imageURL = getImageURL(args);
 
-        const response = await fetch(`https://pokeapi.co/api/v2/pokemon/${pokemonName}`);
-        if (!response.ok) {
-            return message.reply("Pokémon not found.");
-        }
+    const embed = new EmbedBuilder()
+        .setTitle(`🔥 ${displayName} Raid 🔥`)
+        .setDescription(
+            `A wild **${displayName}** has appeared!\n\nReact below to join the raid!`
+        )
+        .setImage(imageURL)
+        .setColor(0xff0000)
+        .setFooter({ text: "POGO Raid Bot" })
+        .setTimestamp();
 
-        const data = await response.json();
+    await message.channel.send({
+        content: `@everyone 🚨 ${displayName} Raid!`,
+        embeds: [embed],
+        allowedMentions: { parse: ['everyone'] }
+    });
 
-        const displayName = data.name.charAt(0).toUpperCase() + data.name.slice(1);
-        const image = data.sprites.other["official-artwork"].front_default;
-
-        const embed = new EmbedBuilder()
-            .setTitle(`🔥 ${displayName} Raid 🔥`)
-            .setDescription(
-                `A wild **${displayName}** has appeared!\n\nReact below to join the raid!`
-            )
-            .setImage(image)
-            .setColor(0xff0000)
-            .setFooter({ text: "POGO Raid Bot" })
-            .setTimestamp();
-
-        await message.channel.send({
-            content: `@everyone 🚨 ${displayName} Raid!`,
-            embeds: [embed],
-            allowedMentions: { parse: ['everyone'] }
-        });
-
-        const notificationChannel = client.channels.cache.get(RAID_NOTIFICATION_CHANNEL_ID);
-        if (notificationChannel) {
-            notificationChannel.send(
-                `🔴 **${displayName.toUpperCase()}** raid reported in ${message.channel}`
-            );
-        }
-
-    } catch (error) {
-        console.error(error);
-        message.reply("Something went wrong.");
+    const notificationChannel = client.channels.cache.get(RAID_NOTIFICATION_CHANNEL_ID);
+    if (notificationChannel) {
+        notificationChannel.send(
+            `🔥 ${displayName.toUpperCase()} raid reported in ${message.channel}`
+        );
     }
 });
 
@@ -188,9 +207,5 @@ client.on('messageCreate', async message => {
 client.once('ready', () => {
     console.log(`Logged in as ${client.user.tag}`);
 });
-
-// ================================
-// 🔐 LOGIN
-// ================================
 
 client.login(process.env.BOT_TOKEN);
