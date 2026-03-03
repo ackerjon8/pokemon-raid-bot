@@ -18,7 +18,8 @@ const GITHUB_REPO = "pokemon-raid-bot";
 const GITHUB_BRANCH = "main";
 const IMAGE_BASE_URL = `https://raw.githubusercontent.com/${GITHUB_USER}/${GITHUB_REPO}/${GITHUB_BRANCH}/assets/raids/`;
 
-const RAID_NOTIFICATION_CHANNEL_ID = "919264575386431529";
+// ✅ NEW RAID CHANNEL ID
+const RAID_NOTIFICATION_CHANNEL_ID = "1478302015577919510";
 
 // ================================
 // 🧠 Format Pokemon Name
@@ -84,14 +85,14 @@ client.on('messageCreate', async message => {
             embed.setImage(imageUrl);
         }
 
-        // Send in the channel command was used
+        // Send in command channel
         await message.channel.send({
             content: `@everyone 🚨 ${displayName} Raid!`,
             embeds: [embed],
             allowedMentions: { parse: ['everyone'] }
         });
 
-        // Send to 🔔 raid-notifications channel
+        // Send to new 🔔 raid-notifications channel
         const notificationChannel = client.channels.cache.get(RAID_NOTIFICATION_CHANNEL_ID);
 
         if (notificationChannel) {
