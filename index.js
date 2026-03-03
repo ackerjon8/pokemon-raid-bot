@@ -31,20 +31,6 @@ const VALOR_ROLE_ID = "1478302012675461185";
 const INSTINCT_ROLE_ID = "1478302012675461183";
 
 // ================================
-// 🧠 HELPER FUNCTIONS
-// ================================
-
-function formatPokemonName(name) {
-    return name.split(' ')
-        .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-        .join(' ');
-}
-
-function uppercaseName(name) {
-    return name.toUpperCase();
-}
-
-// ================================
 // 🚪 AUTO KICK AFTER 24 HOURS
 // ================================
 
@@ -62,14 +48,13 @@ client.on('guildMemberAdd', member => {
 });
 
 // ================================
-// 📜 RULES REACTION → POGO ROLE
+// 📜 RULES REACTION (✅ ONLY)
 // ================================
 
 client.on('messageReactionAdd', async (reaction, user) => {
 
     if (user.bot) return;
 
-    // Ensure reaction is fully cached
     if (reaction.partial) {
         try {
             await reaction.fetch();
@@ -78,10 +63,8 @@ client.on('messageReactionAdd', async (reaction, user) => {
         }
     }
 
-    // Only on the rules message
     if (reaction.message.id !== RULES_MESSAGE_ID) return;
 
-    // Only allow ✅ emoji
     if (reaction.emoji.name !== "✅") {
         reaction.users.remove(user.id).catch(() => {});
         return;
@@ -93,12 +76,11 @@ client.on('messageReactionAdd', async (reaction, user) => {
         await member.roles.add(POGO_ROLE_ID);
     }
 
-    // Auto-remove reaction
     reaction.users.remove(user.id).catch(() => {});
 });
 
 // ================================
-// 🏆 TEAM VERIFICATION SYSTEM
+// 🏆 TEAM VERIFICATION
 // ================================
 
 client.on('messageCreate', async message => {
@@ -109,7 +91,6 @@ client.on('messageCreate', async message => {
 
     const args = message.content.split(" ");
     const teamChoice = args[1]?.toLowerCase();
-
     const member = message.member;
 
     if (!member.roles.cache.has(POGO_ROLE_ID)) {
@@ -118,7 +99,6 @@ client.on('messageCreate', async message => {
 
     const teamRoles = [MYSTIC_ROLE_ID, VALOR_ROLE_ID, INSTINCT_ROLE_ID];
 
-    // Prevent multiple team selection
     for (const roleId of teamRoles) {
         if (member.roles.cache.has(roleId)) {
             return message.reply("You already selected a team.");
@@ -149,7 +129,7 @@ client.on('messageCreate', async message => {
 });
 
 // ================================
-// ⚔️ ASH-STYLE RAID SYSTEM
+// ⚔️ RAID SYSTEM WITH IMAGE
 // ================================
 
 client.on('messageCreate', async message => {
@@ -157,37 +137,52 @@ client.on('messageCreate', async message => {
     if (message.author.bot) return;
     if (!message.content.startsWith("!raid")) return;
 
-    const args = message.content.slice(6).trim();
-    if (!args) return message.reply("Please specify a Pokémon.");
+    const pokemonName = message.content.slice(6).trim().toLowerCase();
+    if (!pokemonName) return message.reply("Please specify a Pokémon.");
 
-    const displayName = formatPokemonName(args);
-    const upperName = uppercaseName(displayName);
+    try {
 
-    const embed = new EmbedBuilder()
-        .setTitle(`🔥 ${displayName} Raid 🔥`)
-        .setDescription(
-            `A wild **${displayName}** has appeared!\n\nReact below to join the raid!`
-        )
-        .setColor(0xff0000)
-        .setFooter({ text: "POGO Raid Bot" })
-        .setTimestamp();
+        const response = await fetch(`https://pokeapi.co/api/v2/pokemon/${pokemonName}`);
+        if (!response.ok) {
+            return message.reply("Pokémon not found.");
+        }
 
-    await message.channel.send({
-        content: `@everyone 🚨 ${displayName} Raid!`,
-        embeds: [embed],
-        allowedMentions: { parse: ['everyone'] }
-    });
+        const data = await response.json();
 
-    const notificationChannel = client.channels.cache.get(RAID_NOTIFICATION_CHANNEL_ID);
-    if (notificationChannel) {
-        notificationChannel.send(
-            `🔴 **${upperName}** raid reported in ${message.channel}`
-        );
+        const displayName = data.name.charAt(0).toUpperCase() + data.name.slice(1);
+        const image = data.sprites.other["official-artwork"].front_default;
+
+        const embed = new EmbedBuilder()
+            .setTitle(`🔥 ${displayName} Raid 🔥`)
+            .setDescription(
+                `A wild **${displayName}** has appeared!\n\nReact below to join the raid!`
+            )
+            .setImage(image)
+            .setColor(0xff0000)
+            .setFooter({ text: "POGO Raid Bot" })
+            .setTimestamp();
+
+        await message.channel.send({
+            content: `@everyone 🚨 ${displayName} Raid!`,
+            embeds: [embed],
+            allowedMentions: { parse: ['everyone'] }
+        });
+
+        const notificationChannel = client.channels.cache.get(RAID_NOTIFICATION_CHANNEL_ID);
+        if (notificationChannel) {
+            notificationChannel.send(
+                `🔴 **${displayName.toUpperCase()}** raid reported in ${message.channel}`
+            );
+        }
+
+    } catch (error) {
+        console.error(error);
+        message.reply("Something went wrong.");
     }
 });
 
 // ================================
-// 🚀 READY EVENT
+// 🚀 READY
 // ================================
 
 client.once('ready', () => {
