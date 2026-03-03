@@ -2,19 +2,16 @@ require('dotenv').config();
 const { 
     Client, 
     GatewayIntentBits, 
-    EmbedBuilder,
-    Partials
+    EmbedBuilder
 } = require('discord.js');
 
 const client = new Client({
     intents: [
         GatewayIntentBits.Guilds,
         GatewayIntentBits.GuildMessages,
-        GatewayIntentBits.GuildMessageReactions,
         GatewayIntentBits.GuildMembers,
         GatewayIntentBits.MessageContent
-    ],
-    partials: [Partials.Message, Partials.Channel, Partials.Reaction]
+    ]
 });
 
 // ================================
@@ -22,15 +19,14 @@ const client = new Client({
 // ================================
 
 const RAID_NOTIFICATION_CHANNEL_ID = "1478302015577919510";
-const RULES_MESSAGE_ID = "1478306983957233754";
 const VERIFICATION_CHANNEL_ID = "1478475843595538672";
 
+const UNVERIFIED_ROLE_NAME = "Unverified";
 const POGO_ROLE_ID = "1478302012675461188";
 const MYSTIC_ROLE_ID = "1478302012675461184";
 const VALOR_ROLE_ID = "1478302012675461185";
 const INSTINCT_ROLE_ID = "1478302012675461183";
 
-// ✅ YOUR CORRECT GITHUB RAW URL
 const BASE_IMAGE_URL = "https://raw.githubusercontent.com/ackerjon8/pokemon-raid-bot/main/assets/raids/";
 
 // ================================
@@ -67,102 +63,83 @@ function getImageURL(input) {
 }
 
 // ================================
-// 🚪 AUTO KICK AFTER 24 HOURS
+// 🚪 GIVE UNVERIFIED ON JOIN
 // ================================
 
-client.on('guildMemberAdd', member => {
+client.on('guildMemberAdd', async member => {
 
+    const unverifiedRole = member.guild.roles.cache.find(r => r.name === UNVERIFIED_ROLE_NAME);
+    if (unverifiedRole) {
+        await member.roles.add(unverifiedRole);
+    }
+
+    // Auto-kick after 24h if still unverified
     setTimeout(async () => {
         const refreshed = await member.guild.members.fetch(member.id).catch(() => null);
         if (!refreshed) return;
 
-        if (!refreshed.roles.cache.has(POGO_ROLE_ID)) {
+        if (refreshed.roles.cache.has(unverifiedRole?.id)) {
             refreshed.kick("Did not verify within 24 hours").catch(() => {});
         }
     }, 24 * 60 * 60 * 1000);
-
 });
 
 // ================================
-// 📜 RULES REACTION (✅ ONLY)
-// ================================
-
-client.on('messageReactionAdd', async (reaction, user) => {
-
-    if (user.bot) return;
-
-    if (reaction.partial) {
-        try { await reaction.fetch(); }
-        catch { return; }
-    }
-
-    if (reaction.message.id !== RULES_MESSAGE_ID) return;
-
-    if (reaction.emoji.name !== "✅") {
-        reaction.users.remove(user.id).catch(() => {});
-        return;
-    }
-
-    const member = await reaction.message.guild.members.fetch(user.id);
-
-    if (!member.roles.cache.has(POGO_ROLE_ID)) {
-        await member.roles.add(POGO_ROLE_ID);
-    }
-
-    reaction.users.remove(user.id).catch(() => {});
-});
-
-// ================================
-// 🏆 TEAM SYSTEM
+// 🏆 FULL VERIFY COMMAND
 // ================================
 
 client.on('messageCreate', async message => {
 
     if (message.author.bot) return;
     if (message.channel.id !== VERIFICATION_CHANNEL_ID) return;
-    if (!message.content.startsWith("!team")) return;
+    if (!message.content.startsWith("!verify")) return;
 
     const args = message.content.split(" ");
-    const teamChoice = args[1]?.toLowerCase();
+    const ign = args[1];
+    const teamChoice = args[2]?.toLowerCase();
+
+    if (!ign || !teamChoice) {
+        return message.reply("Usage: `!verify <IGN> <mystic|valor|instinct>`");
+    }
+
     const member = message.member;
 
-    if (!member.roles.cache.has(POGO_ROLE_ID)) {
-        return message.reply("You must verify in #rules first.");
-    }
-
-    const teamRoles = [MYSTIC_ROLE_ID, VALOR_ROLE_ID, INSTINCT_ROLE_ID];
-
-    for (const roleId of teamRoles) {
-        if (member.roles.cache.has(roleId)) {
-            return message.reply("You already selected a team.");
-        }
-    }
-
-    let roleToGive;
+    let teamRole;
     let teamName;
 
     if (teamChoice === "mystic") {
-        roleToGive = MYSTIC_ROLE_ID;
+        teamRole = MYSTIC_ROLE_ID;
         teamName = "Team Mystic 🔵";
-    } 
-    else if (teamChoice === "valor") {
-        roleToGive = VALOR_ROLE_ID;
+    } else if (teamChoice === "valor") {
+        teamRole = VALOR_ROLE_ID;
         teamName = "Team Valor 🔴";
-    } 
-    else if (teamChoice === "instinct") {
-        roleToGive = INSTINCT_ROLE_ID;
+    } else if (teamChoice === "instinct") {
+        teamRole = INSTINCT_ROLE_ID;
         teamName = "Team Instinct 🟡";
-    } 
-    else {
-        return message.reply("Choose: `!team mystic`, `!team valor`, or `!team instinct`");
+    } else {
+        return message.reply("Team must be: mystic, valor, or instinct.");
     }
 
-    await member.roles.add(roleToGive);
-    message.reply(`You have been assigned ${teamName}`);
+    const unverifiedRole = member.guild.roles.cache.find(r => r.name === UNVERIFIED_ROLE_NAME);
+
+    try {
+        await member.setNickname(ign);
+    } catch {
+        return message.reply("I cannot change your nickname. Check bot permissions.");
+    }
+
+    await member.roles.add(POGO_ROLE_ID);
+    await member.roles.add(teamRole);
+
+    if (unverifiedRole) {
+        await member.roles.remove(unverifiedRole);
+    }
+
+    message.reply(`✅ Verification complete! Welcome ${ign} of ${teamName}!`);
 });
 
 // ================================
-// ⚔️ RAID SYSTEM (MEGA + GMAX SUPPORT)
+// ⚔️ RAID SYSTEM
 // ================================
 
 client.on('messageCreate', async message => {
@@ -183,7 +160,6 @@ client.on('messageCreate', async message => {
         )
         .setImage(imageURL)
         .setColor(0xff0000)
-        .setFooter({ text: "POGO Raid Bot" })
         .setTimestamp();
 
     await message.channel.send({
@@ -191,18 +167,7 @@ client.on('messageCreate', async message => {
         embeds: [embed],
         allowedMentions: { parse: ['everyone'] }
     });
-
-    const notificationChannel = client.channels.cache.get(RAID_NOTIFICATION_CHANNEL_ID);
-    if (notificationChannel) {
-        notificationChannel.send(
-            `🔥 ${displayName.toUpperCase()} raid reported in ${message.channel}`
-        );
-    }
 });
-
-// ================================
-// 🚀 READY
-// ================================
 
 client.once('ready', () => {
     console.log(`Logged in as ${client.user.tag}`);
