@@ -18,6 +18,8 @@ const GITHUB_REPO = "pokemon-raid-bot";
 const GITHUB_BRANCH = "main";
 const IMAGE_BASE_URL = `https://raw.githubusercontent.com/${GITHUB_USER}/${GITHUB_REPO}/${GITHUB_BRANCH}/assets/raids/`;
 
+const RAID_NOTIFICATION_CHANNEL_ID = "919264575386431529";
+
 // ================================
 // 🧠 Format Pokemon Name
 // ================================
@@ -42,7 +44,6 @@ async function getImageUrl(pokemonName) {
         console.log("Custom image not found. Using PokéAPI fallback.");
     }
 
-    // Remove dynamax prefix for API
     const apiName = formatted.replace("dynamax-", "");
 
     try {
@@ -83,11 +84,25 @@ client.on('messageCreate', async message => {
             embed.setImage(imageUrl);
         }
 
+        // Send in the channel command was used
         await message.channel.send({
             content: `@everyone 🚨 ${displayName} Raid!`,
             embeds: [embed],
             allowedMentions: { parse: ['everyone'] }
         });
+
+        // Send to 🔔 raid-notifications channel
+        const notificationChannel = client.channels.cache.get(RAID_NOTIFICATION_CHANNEL_ID);
+
+        if (notificationChannel) {
+            await notificationChannel.send({
+                content: `@everyone 🚨 ${displayName} Raid!`,
+                embeds: [embed],
+                allowedMentions: { parse: ['everyone'] }
+            });
+        } else {
+            console.log("Raid notification channel not found.");
+        }
     }
 });
 
