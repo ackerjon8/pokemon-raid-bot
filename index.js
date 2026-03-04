@@ -21,7 +21,8 @@ const client = new Client({
 const RAID_NOTIFICATION_CHANNEL_ID = "1478302015577919510";
 const VERIFICATION_CHANNEL_ID = "1478475843595538672";
 
-const UNVERIFIED_ROLE_NAME = "Unverified";
+// ROLE IDS (ID-BASED SYSTEM)
+const UNVERIFIED_ROLE_ID = "1478536945427546112";
 const POGO_ROLE_ID = "1478302012675461188";
 const MYSTIC_ROLE_ID = "1478302012675461184";
 const VALOR_ROLE_ID = "1478302012675461185";
@@ -63,76 +64,86 @@ function getImageURL(input) {
 }
 
 // ================================
-// 🚪 GIVE UNVERIFIED ON JOIN
+// 🚪 GIVE UNVERIFIED ROLE ON JOIN
 // ================================
 
 client.on('guildMemberAdd', async member => {
 
-    const unverifiedRole = member.guild.roles.cache.find(r => r.name === UNVERIFIED_ROLE_NAME);
-    if (unverifiedRole) {
-        await member.roles.add(unverifiedRole);
+    try {
+        await member.roles.add(UNVERIFIED_ROLE_ID);
+    } catch (err) {
+        console.log("Error adding unverified role:", err);
     }
 
-    // Auto-kick after 24h if still unverified
+    // Auto-kick after 24 hours if still unverified
     setTimeout(async () => {
         const refreshed = await member.guild.members.fetch(member.id).catch(() => null);
         if (!refreshed) return;
 
-        if (refreshed.roles.cache.has(unverifiedRole?.id)) {
+        if (refreshed.roles.cache.has(UNVERIFIED_ROLE_ID)) {
             refreshed.kick("Did not verify within 24 hours").catch(() => {});
         }
     }, 24 * 60 * 60 * 1000);
 });
 
 // ================================
-// 🏆 FULL VERIFY COMMAND
+// 🏆 VERIFY COMMAND
 // ================================
 
 client.on('messageCreate', async message => {
 
     if (message.author.bot) return;
     if (message.channel.id !== VERIFICATION_CHANNEL_ID) return;
-    if (!message.content.startsWith("!verify")) return;
+    if (!message.content.toLowerCase().startsWith("!verify")) return;
 
-    const args = message.content.split(" ");
-    const ign = args[1];
-    const teamChoice = args[2]?.toLowerCase();
+    const args = message.content.split(" ").slice(1);
 
-    if (!ign || !teamChoice) {
+    if (args.length < 2) {
         return message.reply("Usage: `!verify <IGN> <mystic|valor|instinct>`");
     }
 
-    const member = message.member;
+    const ign = args[0];
+
+    const teamInput = args
+        .slice(1)
+        .join(" ")
+        .toLowerCase()
+        .replace("team ", "")
+        .trim();
 
     let teamRole;
     let teamName;
 
-    if (teamChoice === "mystic") {
+    if (teamInput === "mystic") {
         teamRole = MYSTIC_ROLE_ID;
         teamName = "Team Mystic 🔵";
-    } else if (teamChoice === "valor") {
+    } 
+    else if (teamInput === "valor") {
         teamRole = VALOR_ROLE_ID;
         teamName = "Team Valor 🔴";
-    } else if (teamChoice === "instinct") {
+    } 
+    else if (teamInput === "instinct") {
         teamRole = INSTINCT_ROLE_ID;
         teamName = "Team Instinct 🟡";
-    } else {
-        return message.reply("Team must be: mystic, valor, or instinct.");
+    } 
+    else {
+        return message.reply("Team must be mystic, valor, or instinct.");
     }
 
-    const unverifiedRole = member.guild.roles.cache.find(r => r.name === UNVERIFIED_ROLE_NAME);
+    const member = message.member;
 
     try {
         await member.setNickname(ign);
     } catch {
-        return message.reply("I cannot change your nickname. Check bot permissions.");
+        return message.reply("I cannot change your nickname. Move my role higher and enable Manage Nicknames.");
     }
 
-    await member.roles.add(POGO_ROLE_ID);
-    await member.roles.add(teamRole);
-
-    if (unverifiedRole) {
-        await member.roles.remove(unverifiedRole);
+    try {
+        await member.roles.add([POGO_ROLE_ID, teamRole]);
+        await member.roles.remove(UNVERIFIED_ROLE_ID);
+    } catch (err) {
+        console.log("Role error:", err);
+        return message.reply("I cannot assign roles. Check role hierarchy.");
     }
 
     message.reply(`✅ Verification complete! Welcome ${ign} of ${teamName}!`);
@@ -167,7 +178,18 @@ client.on('messageCreate', async message => {
         embeds: [embed],
         allowedMentions: { parse: ['everyone'] }
     });
+
+    const notificationChannel = client.channels.cache.get(RAID_NOTIFICATION_CHANNEL_ID);
+    if (notificationChannel) {
+        notificationChannel.send(
+            `🔥 ${displayName.toUpperCase()} raid reported in ${message.channel}`
+        );
+    }
 });
+
+// ================================
+// 🚀 READY
+// ================================
 
 client.once('ready', () => {
     console.log(`Logged in as ${client.user.tag}`);
