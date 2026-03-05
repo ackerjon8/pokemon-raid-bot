@@ -1,10 +1,12 @@
 require("dotenv").config();
-const { 
-Client, 
-GatewayIntentBits, 
-Partials, 
-EmbedBuilder 
+
+const {
+Client,
+GatewayIntentBits,
+Partials,
+EmbedBuilder
 } = require("discord.js");
+
 const axios = require("axios");
 
 const client = new Client({
@@ -20,10 +22,13 @@ partials: [Partials.Message, Partials.Channel, Partials.Reaction]
 
 const PREFIX = "!";
 
+/* CHANNEL IDS */
+
 const RAID_NOTIFICATION_CHANNEL = "1478302015577919510";
-const RULES_CHANNEL = "1478302013971238985";
-const VERIFICATION_CHANNEL = "1478475843595538672";
 const RULE_MESSAGE_ID = "1478306983957233754";
+const VERIFICATION_CHANNEL = "1478475843595538672";
+
+/* ROLE IDS */
 
 const ROLE_UNVERIFIED = "1478536945427546112";
 const ROLE_TRAINER = "1478302012675461188";
@@ -31,38 +36,47 @@ const TEAM_MYSTIC = "1478302012675461184";
 const TEAM_VALOR = "1478302012675461185";
 const TEAM_INSTINCT = "1478302012675461183";
 
-const GITHUB_RAIDS =
+/* GITHUB RAID IMAGE PATH */
+
+const GITHUB_RAID_IMAGES =
 "https://raw.githubusercontent.com/ackerjon8/pokemon-raid-bot/main/assets/raids/";
+
+/* BOT READY */
 
 client.once("ready", () => {
 console.log(`✅ Logged in as ${client.user.tag}`);
 });
 
-async function getPokemonImage(name) {
+/* IMAGE FETCH FUNCTION */
+
+async function getPokemonImage(name){
 
 let formatted = name.toLowerCase().replace(/ /g,"-");
 
-const githubImage = `${GITHUB_RAIDS}${formatted}.png`;
+const githubImage = `${GITHUB_RAID_IMAGES}${formatted}.png`;
 
-try {
+try{
+
 await axios.get(githubImage);
 return githubImage;
-} catch {}
 
-try {
+}catch{}
+
+try{
 
 const apiName = formatted
 .replace("mega-","")
 .replace("gigantamax-","")
+.replace("dynamax-","")
 .replace("gmax-","");
 
-const data = await axios.get(
+const response = await axios.get(
 `https://pokeapi.co/api/v2/pokemon/${apiName}`
 );
 
-return data.data.sprites.other["official-artwork"].front_default;
+return response.data.sprites.other["official-artwork"].front_default;
 
-} catch {
+}catch{
 
 return null;
 
@@ -70,13 +84,17 @@ return null;
 
 }
 
-client.on("messageCreate", async (message) => {
+/* MESSAGE COMMANDS */
+
+client.on("messageCreate", async (message)=>{
 
 if(message.author.bot) return;
 if(!message.content.startsWith(PREFIX)) return;
 
 const args = message.content.slice(PREFIX.length).trim().split(/ +/);
 const command = args.shift().toLowerCase();
+
+/* RAID COMMAND */
 
 if(command === "raid"){
 
@@ -85,75 +103,76 @@ return message.reply("Usage: `!raid pokemon`");
 }
 
 const pokemon = args.join(" ");
+
 const image = await getPokemonImage(pokemon);
 
 const embed = new EmbedBuilder()
-.setTitle(`🔥 ${pokemon} Raid 🔥`)
-.setDescription(
-`A wild **${pokemon}** has appeared!\n\nReact below to join the raid!`
-)
+.setTitle(`🔥 ${pokemon} Raid`)
+.setDescription(`A wild **${pokemon}** has appeared!\n\nReact below to join the raid.`)
 .setColor("Orange")
 .setTimestamp();
 
 if(image) embed.setImage(image);
+
+/* RAID CHANNEL MESSAGE (WITH IMAGE) */
 
 await message.channel.send({
 content:`@everyone 🚨 **${pokemon} Raid!**`,
 embeds:[embed]
 });
 
-const bellChannel = message.guild.channels.cache.get(RAID_NOTIFICATION_CHANNEL);
+/* NOTIFICATION CHANNEL MESSAGE (TEXT ONLY) */
+
+const bellChannel =
+message.guild.channels.cache.get(RAID_NOTIFICATION_CHANNEL);
 
 if(bellChannel){
 
-await bellChannel.send({
-content:`@everyone 🚨 **${pokemon} Raid!**`,
-embeds:[embed]
-});
+await bellChannel.send(
+`@everyone 🚨 **${pokemon} Raid!**\nRaid location: <#${message.channel.id}>`
+);
 
 }
 
 }
+
+/* VERIFY COMMAND */
 
 if(command === "verify"){
 
 if(message.channel.id !== VERIFICATION_CHANNEL){
-return message.reply("Use this command in verification channel.");
+return message.reply("Use this command in the verification channel.");
 }
 
-const ign = args[0];
-const team = args[1]?.toLowerCase();
-
-if(!ign || !team){
+if(args.length < 2){
 return message.reply(
 "Usage: `!verify IGN team`\nExample: `!verify Null mystic`"
 );
 }
 
-const member = message.member;
-
-if(!member.roles.cache.has(ROLE_TRAINER)){
-return message.reply(
-"You must react to the rules message first."
-);
-}
+const ign = args[0];
+const team = args[args.length-1].toLowerCase();
 
 let teamRole;
 
-if(team === "mystic") teamRole = TEAM_MYSTIC;
-if(team === "valor") teamRole = TEAM_VALOR;
-if(team === "instinct") teamRole = TEAM_INSTINCT;
+if(team.includes("mystic")) teamRole = TEAM_MYSTIC;
+if(team.includes("valor")) teamRole = TEAM_VALOR;
+if(team.includes("instinct")) teamRole = TEAM_INSTINCT;
 
 if(!teamRole){
-return message.reply("Team must be: mystic, valor, or instinct");
+return message.reply(
+"Team must be Mystic, Valor, or Instinct."
+);
 }
+
+const member = message.member;
 
 if(
 member.roles.cache.has(TEAM_MYSTIC) ||
 member.roles.cache.has(TEAM_VALOR) ||
 member.roles.cache.has(TEAM_INSTINCT)
 ){
-return message.reply("You already picked a team.");
+return message.reply("You already selected a team.");
 }
 
 await member.roles.add(teamRole);
@@ -164,12 +183,14 @@ await member.setNickname(ign);
 }catch{}
 
 return message.reply(
-`✅ Verified!\nIGN set to **${ign}**\nTeam role assigned.`
+`✅ Verified!\nIGN set to **${ign}**`
 );
 
 }
 
 });
+
+/* RULES REACTION ROLE */
 
 client.on("messageReactionAdd", async (reaction,user)=>{
 
@@ -177,8 +198,7 @@ if(user.bot) return;
 
 if(reaction.message.id !== RULE_MESSAGE_ID) return;
 
-const guild = reaction.message.guild;
-const member = await guild.members.fetch(user.id);
+const member = await reaction.message.guild.members.fetch(user.id);
 
 if(!member.roles.cache.has(ROLE_TRAINER)){
 
@@ -186,24 +206,37 @@ await member.roles.add(ROLE_TRAINER);
 
 }
 
+/* REMOVE REACTION */
+
 reaction.users.remove(user.id);
 
 });
+
+/* AUTO ROLE + AUTO KICK SYSTEM */
 
 client.on("guildMemberAdd", async member => {
 
 await member.roles.add(ROLE_UNVERIFIED);
 
-setTimeout(async () => {
+/* 24H VERIFICATION TIMER */
 
-if(member.roles.cache.has(ROLE_UNVERIFIED)){
+setTimeout(async ()=>{
 
-member.kick("Did not verify within 24 hours");
+const refreshed = await member.guild.members.fetch(member.id)
+.catch(()=>null);
+
+if(!refreshed) return;
+
+if(refreshed.roles.cache.has(ROLE_UNVERIFIED)){
+
+refreshed.kick("Did not verify within 24 hours");
 
 }
 
 }, 86400000);
 
 });
+
+/* LOGIN */
 
 client.login(process.env.TOKEN);
