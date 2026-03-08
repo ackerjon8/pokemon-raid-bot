@@ -25,8 +25,8 @@ const PREFIX = "!";
 /* CHANNEL IDS */
 
 const RAID_NOTIFICATION_CHANNEL = "1478302015577919510";
-const RULE_MESSAGE_ID = "1478306983957233754";
 const VERIFICATION_CHANNEL = "1478475843595538672";
+const RULE_MESSAGE_ID = "1478306983957233754";
 
 /* ROLE IDS */
 
@@ -36,18 +36,20 @@ const TEAM_MYSTIC = "1478302012675461184";
 const TEAM_VALOR = "1478302012675461185";
 const TEAM_INSTINCT = "1478302012675461183";
 
-/* GITHUB RAID IMAGE PATH */
+/* GITHUB IMAGE PATH */
 
 const GITHUB_RAID_IMAGES =
 "https://raw.githubusercontent.com/ackerjon8/pokemon-raid-bot/main/assets/raids/";
 
-/* BOT READY */
+/* READY */
 
 client.once("ready", () => {
+
 console.log(`✅ Logged in as ${client.user.tag}`);
+
 });
 
-/* IMAGE FETCH FUNCTION */
+/* IMAGE FETCH */
 
 async function getPokemonImage(name){
 
@@ -70,11 +72,11 @@ const apiName = formatted
 .replace("dynamax-","")
 .replace("gmax-","");
 
-const response = await axios.get(
+const res = await axios.get(
 `https://pokeapi.co/api/v2/pokemon/${apiName}`
 );
 
-return response.data.sprites.other["official-artwork"].front_default;
+return res.data.sprites.other["official-artwork"].front_default;
 
 }catch{
 
@@ -84,7 +86,7 @@ return null;
 
 }
 
-/* MESSAGE COMMANDS */
+/* COMMAND HANDLER */
 
 client.on("messageCreate", async (message)=>{
 
@@ -114,14 +116,14 @@ const embed = new EmbedBuilder()
 
 if(image) embed.setImage(image);
 
-/* RAID CHANNEL MESSAGE (WITH IMAGE) */
+/* RAID CHANNEL */
 
 await message.channel.send({
 content:`@everyone 🚨 **${pokemon} Raid!**`,
 embeds:[embed]
 });
 
-/* NOTIFICATION CHANNEL MESSAGE (TEXT ONLY) */
+/* NOTIFICATION CHANNEL */
 
 const bellChannel =
 message.guild.channels.cache.get(RAID_NOTIFICATION_CHANNEL);
@@ -167,6 +169,8 @@ return message.reply(
 
 const member = message.member;
 
+/* PREVENT MULTIPLE TEAM ROLES */
+
 if(
 member.roles.cache.has(TEAM_MYSTIC) ||
 member.roles.cache.has(TEAM_VALOR) ||
@@ -175,15 +179,24 @@ member.roles.cache.has(TEAM_INSTINCT)
 return message.reply("You already selected a team.");
 }
 
-await member.roles.add(teamRole);
+/* ADD TRAINER + TEAM ROLE */
+
+await member.roles.add([ROLE_TRAINER, teamRole]);
+
+/* REMOVE UNVERIFIED */
+
 await member.roles.remove(ROLE_UNVERIFIED);
+
+/* SET IGN */
 
 try{
 await member.setNickname(ign);
 }catch{}
 
+/* SUCCESS */
+
 return message.reply(
-`✅ Verified!\nIGN set to **${ign}**`
+`✅ Verification complete!\nIGN set to **${ign}**`
 );
 
 }
@@ -198,7 +211,8 @@ if(user.bot) return;
 
 if(reaction.message.id !== RULE_MESSAGE_ID) return;
 
-const member = await reaction.message.guild.members.fetch(user.id);
+const member =
+await reaction.message.guild.members.fetch(user.id);
 
 if(!member.roles.cache.has(ROLE_TRAINER)){
 
@@ -212,18 +226,18 @@ reaction.users.remove(user.id);
 
 });
 
-/* AUTO ROLE + AUTO KICK SYSTEM */
+/* MEMBER JOIN */
 
 client.on("guildMemberAdd", async member => {
 
 await member.roles.add(ROLE_UNVERIFIED);
 
-/* 24H VERIFICATION TIMER */
+/* 24H VERIFY TIMER */
 
 setTimeout(async ()=>{
 
-const refreshed = await member.guild.members.fetch(member.id)
-.catch(()=>null);
+const refreshed =
+await member.guild.members.fetch(member.id).catch(()=>null);
 
 if(!refreshed) return;
 
